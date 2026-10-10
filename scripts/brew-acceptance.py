@@ -61,6 +61,7 @@ try:
         if args.use_installed_go:
             compiler = str(Path(run(['go', 'env', 'GOROOT'])) / 'bin/go')
             formula = formula.replace('system "go"', 'system ' + json.dumps(compiler))
+            formula = formula.replace('Utils.safe_popen_read("go"', 'Utils.safe_popen_read(' + json.dumps(compiler))
             # This fixture uses a verified existing compiler. The production
             # Formula retains its normal build dependency.
             formula = formula.replace('  depends_on "go" => :build\n', '')
