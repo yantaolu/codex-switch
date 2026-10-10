@@ -13,9 +13,15 @@ import subprocess
 import tarfile
 
 root = Path(__file__).resolve().parents[1]
+# Only maintained public documents enter release packages.
+public_documents = ('README.md', 'CHANGELOG.md', 'docs/usage.md',
+                    'docs/providers.md', 'docs/troubleshooting.md',
+                    'docs/architecture.md', 'docs/development.md',
+                    'docs/releasing.md')
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--version', required=True)
 parser.add_argument('--output', type=Path, default=root / 'dist')
+parser.add_argument('--arch', choices=('arm64', 'amd64'), help='Build only one architecture; default builds both')
 args = parser.parse_args()
 if not re.fullmatch(r'\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?', args.version):
     parser.error('version must be a semantic version')
@@ -62,14 +68,15 @@ def archive(path, entries):
                 tar.addfile(info, io.BytesIO(data))
 
 artifacts = []
-for arch in ('arm64', 'amd64'):
+for arch in (args.arch,) if args.arch else ('arm64', 'amd64'):
     binary_dir = output / f'darwin-{arch}'
     binary_dir.mkdir(exist_ok=True)
     binary = binary_dir / 'codex-switch'
     env = dict(os.environ, GOOS='darwin', GOARCH=arch, CGO_ENABLED='0')
     subprocess.run(['go', 'build', '-trimpath', '-ldflags', f'-s -w -X main.version={args.version}', '-o', str(binary), './cmd/codex-switch'], cwd=root, env=env, check=True)
     package = output / f'codex-switch_{args.version}_darwin_{arch}.tar.gz'
-    entries = [('codex-switch', binary), ('LICENSE', root / 'LICENSE'), ('README.md', root / 'README.md'), ('modules.json', manifest)]
+    entries = [('codex-switch', binary), ('LICENSE', root / 'LICENSE'), ('modules.json', manifest)]
+    entries += [(name, root / name) for name in public_documents]
     entries += [(str(p.relative_to(output)), p) for p in licenses.rglob('*') if p.is_file()]
     archive(package, entries)
     artifacts.append(package)
@@ -85,7 +92,7 @@ for name in ('cmd', 'internal'):
     source_entries += [(f'codex-switch-{args.version}/{p.relative_to(root)}', p) for p in (root / name).rglob('*.go')]
 for directory in ('scripts', 'packaging'):
     source_entries += [(f'codex-switch-{args.version}/{p.relative_to(root)}', p) for p in (root / directory).rglob('*') if p.is_file() and p.suffix in ('.py', '.in')]
-for name in ('go.mod', 'go.sum', 'LICENSE', 'README.md', 'Makefile'):
+for name in ('go.mod', 'go.sum', 'LICENSE', 'Makefile', *public_documents):
     source_entries.append((f'codex-switch-{args.version}/{name}', root / name))
 source_package = output / f'codex-switch_{args.version}_source.tar.gz'
 archive(source_package, source_entries)

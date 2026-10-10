@@ -16,7 +16,7 @@ import (
 	"golang.org/x/term"
 )
 
-var version = "0.8.0-dev"
+var version = "1.0.0"
 
 func main() {
 	switcher.ClientVersion = version

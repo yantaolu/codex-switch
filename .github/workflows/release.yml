@@ -1,0 +1,123 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing stable tag, e.g. v1.0.0; creates a draft release'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: amd64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      RELEASE_ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+      - name: Validate stable tag
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "RELEASE_VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Install native protocol test dependency
+        run: |
+          npm install --global @openai/codex@0.162.0
+          codex --version
+          echo "CODEX_SWITCH_NATIVE_CLI=$(command -v codex)" >> "$GITHUB_ENV"
+      - name: Verify host architecture
+        run: test "$(go env GOARCH)" = "$RELEASE_ARCH"
+      - run: go test -race -count=1 -timeout 3m ./...
+      - run: go vet ./...
+      - run: go mod verify
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: CXS_PROCESS_ACCEPTANCE=1 go test ./internal/switcher -run '^TestControlledForceStopKeepsOtherHome$' -count=1 -timeout 30s
+      - name: Homebrew installation lifecycle
+        run: python3 scripts/brew-acceptance.py --output dist/validation/brew-release.json
+      - name: Package native build
+        run: python3 scripts/release.py --version "$RELEASE_VERSION" --arch "$RELEASE_ARCH"
+      - name: Run packaged binary
+        run: |
+          test "$(dist/darwin-$RELEASE_ARCH/codex-switch version)" = "$RELEASE_VERSION"
+          dist/darwin-$RELEASE_ARCH/codex-switch --help
+          dist/darwin-$RELEASE_ARCH/codex-switch use --help
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -mode=binary "dist/darwin-$RELEASE_ARCH/codex-switch"
+      - run: shasum -a 256 -c checksums.txt
+        working-directory: dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-${{ matrix.arch }}
+          path: |
+            dist/*.tar.gz
+            dist/checksums.txt
+            dist/codex-switch.rb
+            dist/validation/brew-release.json
+          if-no-files-found: error
+          retention-days: 30
+
+  draft:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: release-*
+          path: artifacts
+      - name: Assemble verified attachments
+        run: |
+          version="${RELEASE_TAG#v}"
+          mkdir release
+          (cd artifacts/release-arm64 && sha256sum -c checksums.txt)
+          (cd artifacts/release-amd64 && sha256sum -c checksums.txt)
+          cmp "artifacts/release-arm64/codex-switch_${version}_source.tar.gz" "artifacts/release-amd64/codex-switch_${version}_source.tar.gz"
+          cp "artifacts/release-arm64/codex-switch_${version}_darwin_arm64.tar.gz" release/
+          cp "artifacts/release-amd64/codex-switch_${version}_darwin_amd64.tar.gz" release/
+          cp "artifacts/release-arm64/codex-switch_${version}_source.tar.gz" release/
+          cp artifacts/release-arm64/codex-switch.rb release/
+          (cd release && sha256sum *.tar.gz > checksums.txt)
+      - name: Create complete draft release
+        run: |
+          if gh release view "$RELEASE_TAG" --json isDraft --jq '.isDraft' > draft-state.txt 2>/dev/null; then
+            test "$(cat draft-state.txt)" = true
+            gh release upload "$RELEASE_TAG" release/* --clobber
+          else
+            gh release create "$RELEASE_TAG" release/* --verify-tag --draft \
+              --title "codex-switch $RELEASE_TAG" --notes-file CHANGELOG.md
+          fi
