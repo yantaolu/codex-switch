@@ -1,0 +1,38 @@
+name: checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test -race -timeout 3m ./...
+      - run: go vet ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: make build
+      - run: CXS_PROCESS_ACCEPTANCE=1 go test ./internal/switcher -run '^TestControlledForceStopKeepsOtherHome$' -timeout 30s
+      - run: python3 scripts/brew-acceptance.py --output docs/brew-ci.json
+      - run: python3 scripts/release.py --version 0.8.0-ci
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -mode=binary dist/darwin-arm64/codex-switch
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -mode=binary dist/darwin-amd64/codex-switch
+      - run: shasum -a 256 -c checksums.txt
+        working-directory: dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-${{ matrix.runner }}
+          path: |
+            dist/*.tar.gz
+            dist/checksums.txt
+            dist/codex-switch.rb
+            docs/brew-ci.json
+          retention-days: 7

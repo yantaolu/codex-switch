@@ -1,0 +1,6 @@
+/bin/
+/dist/
+*.enc
+*.auth.json
+.DS_Store
+coverage.out

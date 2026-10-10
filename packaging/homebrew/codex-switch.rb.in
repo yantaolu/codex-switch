@@ -1,0 +1,34 @@
+class CodexSwitch < Formula
+  desc "Switch local Codex accounts and Responses-compatible providers"
+  homepage "https://github.com/yantaolu/codex-switch"
+  url "https://github.com/yantaolu/codex-switch/releases/download/v@VERSION@/codex-switch_@VERSION@_source.tar.gz"
+  sha256 "@SHA256@"
+  version "@VERSION@"
+  license "MIT"
+
+  depends_on :macos
+  depends_on "go" => :build
+
+  def install
+    ENV["CGO_ENABLED"] = "0"
+    ENV["GOPROXY"] = "off"
+    ENV["GOSUMDB"] = "off"
+    system "go", "build", "-mod=vendor", *std_go_args(output: bin/"codex-switch", ldflags: "-s -w -X main.version=#{version}"), "./cmd/codex-switch"
+  end
+
+  def caveats
+    <<~EOS
+      Run codex-switch to manage accounts. Switching leaves clients stopped.
+      Codex CLI is needed for login, switching, usage and native session forks.
+      Account data and Keychain entries are retained on uninstall.
+      After upgrading an older helper-based setup, run codex-switch doctor;
+      use codex-switch use <ID> to rewrite its verified stable helper path.
+    EOS
+  end
+
+  test do
+    assert_equal version.to_s, shell_output("#{bin}/codex-switch version").strip
+    assert_match "codex-switch", shell_output("#{bin}/codex-switch --help")
+    assert_match "--force", shell_output("#{bin}/codex-switch use --help")
+  end
+end

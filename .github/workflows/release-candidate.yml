@@ -1,0 +1,38 @@
+name: release candidate
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semantic version, e.g. 0.8.0-rc.1; creates artifacts only"
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      RELEASE_VERSION: ${{ inputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test -race -timeout 3m ./...
+      - run: go vet ./...
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
+      - run: python3 scripts/release.py --version "$RELEASE_VERSION"
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -mode=binary dist/darwin-arm64/codex-switch
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -mode=binary dist/darwin-amd64/codex-switch
+      - run: shasum -a 256 -c checksums.txt
+        working-directory: dist
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-candidate
+          path: |
+            dist/*.tar.gz
+            dist/checksums.txt
+            dist/codex-switch.rb
+          retention-days: 30
