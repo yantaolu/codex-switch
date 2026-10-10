@@ -52,6 +52,8 @@ try:
         candidate = fixture / f'package-{index}'
         run(['python3', 'scripts/release.py', '--version', version, '--output', str(candidate)])
         formula = (candidate / 'codex-switch.rb').read_text()
+        # Fixture URLs do not carry a stable version recognizable by Homebrew.
+        formula = formula.replace('  license "MIT"', f'  version "{version}"\n  license "MIT"')
         formula = formula.replace('class CodexSwitch < Formula', 'class CodexSwitchAcceptance < Formula')
         source = candidate / f'codex-switch_{version}_source.tar.gz'
         formula = re.sub(r'  url "[^"]+"', f'  url "{source.as_uri()}"', formula)
