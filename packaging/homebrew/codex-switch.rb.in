@@ -20,7 +20,9 @@ class CodexSwitch < Formula
       (license_dir/path.relative_path_from(buildpath/"vendor").dirname).install path
     end
     goroot = Utils.safe_popen_read("go", "env", "GOROOT").strip
-    license_dir.install Pathname.new(goroot)/"LICENSE" => "Go-LICENSE"
+    go_license = [Pathname.new(goroot)/"LICENSE", Pathname.new(goroot).parent/"LICENSE"].find(&:file?)
+    odie "Go distribution license missing" unless go_license
+    license_dir.install go_license => "Go-LICENSE"
   end
 
   def caveats

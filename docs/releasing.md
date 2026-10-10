@@ -53,11 +53,13 @@ Apple Silicon 本机运行 arm64；Intel 本机运行 amd64。使用与本机匹
 
 ## Homebrew Tap
 
-Tap 位于 `https://github.com/yantaolu/homebrew-tap`。将生成的 `codex-switch.rb` 放入 `Formula/`，通过 PR 提交，确认其下载 URL 和 SHA-256 对应已经公开的源码附件。
+Tap 位于 `https://github.com/yantaolu/homebrew-tap`。通过 PR 更新 `Formula/codex-switch.rb` 中的版本、ARM64 与 AMD64 安装包 URL 和 SHA-256，确认其对应已经公开的二进制附件。Release 中生成的 `codex-switch.rb` 是可选的源码构建配方，与 Tap 的二进制安装配方分别维护。
 
 Tap 的 `tests.yml` 使用 Homebrew 官方 test-bot 在双架构 macOS runner 上验证配方、构建和测试 bottles。全部检查通过后，运行 `publish.yml`，填写 PR 编号及已审核的完整 head SHA；工作流核对 PR 状态与检查结果，使用 `brew pr-pull` 发布 bottles 并提交相应校验和。
 
-匹配平台安装时自动使用 bottle，无需 Go；不匹配时回退源码构建。Formula 的 Go 依赖仅用于构建，源码归档中的 `vendor` 提供依赖，构建关闭依赖网络下载。bottle 是 Homebrew 专用归档，与主 Release 的手动安装包分别维护。
+匹配平台安装时自动使用 bottle；其他 macOS 平台安装对应架构的正式版二进制包，均无需 Go。Tap 从已通过原生验收的二进制附件生成 bottles，安装相同的文档与许可证。bottle 是 Homebrew 专用归档，与主 Release 的手动安装包分别维护。
+
+自行选择源码构建配方时，其 Go 依赖仅用于构建，源码归档中的 `vendor` 提供依赖，构建关闭依赖网络下载。Homebrew 在部分 Intel 平台没有 Go 的预编译包，源码构建可能需要自行准备工具链；日常安装推荐使用 Tap。
 
 ```sh
 brew install yantaolu/tap/codex-switch
