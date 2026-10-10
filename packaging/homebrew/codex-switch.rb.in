@@ -13,6 +13,14 @@ class CodexSwitch < Formula
     ENV["GOPROXY"] = "off"
     ENV["GOSUMDB"] = "off"
     system "go", "build", "-mod=vendor", *std_go_args(output: bin/"codex-switch", ldflags: "-s -w -X main.version=#{version}"), "./cmd/codex-switch"
+    doc.install "README.md", "CHANGELOG.md", "LICENSE", "docs"
+    pkgshare.install "go.mod", "go.sum"
+    license_dir = pkgshare/"licenses"
+    buildpath.glob("vendor/**/{LICENSE*,LICENCE*,COPYING*}").select(&:file?).each do |path|
+      (license_dir/path.relative_path_from(buildpath/"vendor").dirname).install path
+    end
+    goroot = Utils.safe_popen_read("go", "env", "GOROOT").strip
+    license_dir.install Pathname.new(goroot)/"LICENSE" => "Go-LICENSE"
   end
 
   def caveats
