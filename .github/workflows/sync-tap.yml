@@ -1,0 +1,43 @@
+name: Sync Homebrew Tap
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing public stable release (vMAJOR.MINOR.PATCH)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+concurrency:
+  group: sync-homebrew-tap
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'yantaolu/codex-switch' && (github.event_name == 'workflow_dispatch' || (!github.event.release.prerelease && !github.event.release.draft))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Create Tap installation token
+        id: app
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ vars.TAP_APP_ID }}
+          private-key: ${{ secrets.TAP_APP_PRIVATE_KEY }}
+          owner: yantaolu
+          repositories: homebrew-tap
+          permission-contents: write
+          permission-pull-requests: write
+      - name: Validate release and update Tap PR
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: python3 scripts/sync-tap.py --tag "$RELEASE_TAG"

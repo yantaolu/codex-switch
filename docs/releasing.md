@@ -4,7 +4,7 @@
 
 发布 macOS Apple Silicon、Intel 的可执行包，以及供 Homebrew 离线构建的 vendored 源码包。附件包含许可证、公开文档和依赖信息。
 
-稳定 tag 触发正式工作流，在双架构验收通过后创建 GitHub Release 草稿。维护者核对后公开 Release，再通过 Tap 的 PR 验收和发布 bottles。候选工作流仍只生成附件。
+稳定 tag 触发正式工作流，在双架构验收通过后创建 GitHub Release 草稿。维护者核对后公开 Release，自动生成 Tap 更新 PR；双架构验收通过后自动发布 bottles 和更新配方。候选工作流仍只生成附件。
 
 ## 发布前检查
 
@@ -53,9 +53,11 @@ Apple Silicon 本机运行 arm64；Intel 本机运行 amd64。使用与本机匹
 
 ## Homebrew Tap
 
-Tap 位于 `https://github.com/yantaolu/homebrew-tap`。通过 PR 更新 `Formula/codex-switch.rb` 中的版本、ARM64 与 AMD64 安装包 URL 和 SHA-256，确认其对应已经公开的二进制附件。Release 中生成的 `codex-switch.rb` 是可选的源码构建配方，与 Tap 的二进制安装配方分别维护。
+Tap 位于 `https://github.com/yantaolu/homebrew-tap`。主仓库的 `sync-tap.yml` 响应稳定 Release 的 `published` 事件，下载并核对双架构二进制和源码归档的 SHA-256，然后创建 `release/codex-switch-vX.Y.Z` 分支及 PR。配方保留安装逻辑，更新版本、双架构 URL 与校验和，并移除上一版本的 bottle 块。Release 中生成的 `codex-switch.rb` 是可选的源码构建配方，与 Tap 的二进制安装配方分别维护。
 
-Tap 的 `tests.yml` 使用 Homebrew 官方 test-bot 在双架构 macOS runner 上验证配方、构建和测试 bottles。全部检查通过后，运行 `publish.yml`，填写 PR 编号及已审核的完整 head SHA；工作流核对 PR 状态与检查结果，使用 `brew pr-pull` 发布 bottles 并提交相应校验和。
+Tap 的 `tests.yml` 使用 Homebrew 官方 test-bot 在双架构 macOS runner 上验证配方、构建和测试 bottles。整个工作流成功后，`publish.yml` 自动选择当前 head 对应的受管版本 PR，核对两种架构的成功任务及未过期附件，并再次验证正式 Release。通过 `brew pr-pull` 获取测试附件，使用 `brew bottle --merge --write` 合并配方，上传缺失的 bottles。公开 bottles 的 SHA-256 校验通过后才推送 Tap 主分支、关闭 PR 并删除分支。
+
+已有版本不会重复生成 PR 或替换附件；较旧版本不会造成降级。任一校验失败都停止更新 Tap 主分支。上传中断后重试只补齐缺失文件，已有文件必须与测试产物完全一致。
 
 匹配平台安装时自动使用 bottle；其他 macOS 平台安装对应架构的正式版二进制包，均无需 Go。Tap 从已通过原生验收的二进制附件生成 bottles，安装相同的文档与许可证。bottle 是 Homebrew 专用归档，与主 Release 的手动安装包分别维护。
 
@@ -66,7 +68,29 @@ brew install yantaolu/tap/codex-switch
 brew upgrade codex-switch
 ```
 
-公开 Tap 后，验证真实 URL 下载、bottle 安装、版本输出、升级和卸载数据保留，再完成发布验收。主项目工作流只需本仓库 `GITHUB_TOKEN`；Tap 在自己的工作流中发布 bottles，不需要主项目持有跨仓库写入密钥。
+公开 Tap 后，验证真实 URL 下载、bottle 安装、版本输出、升级和卸载数据保留，再完成发布验收。主项目使用只授权 Tap 的 GitHub App 创建 PR；Tap 使用自己的 `GITHUB_TOKEN` 发布 bottles。运行时和安装包不包含这些发布凭据。
+
+### 一次性授权
+
+维护者使用具有仓库管理权限的 `gh` 登录后运行：
+
+```sh
+python3 scripts/setup-tap-app.py
+```
+
+浏览器中注册私人 App，选择 **Only select repositories**，仅安装到 `homebrew-tap`，然后回到配置页点击核验。脚本检查安装范围，将 App ID 保存到主仓库 Actions Variable `TAP_APP_ID`，私钥保存到 Actions Secret `TAP_APP_PRIVATE_KEY`，并删除本地临时私钥。页面只在本机回环地址开放，30 分钟后超时关闭。
+
+App 仅需要仓库 **Contents: Read and write**、**Pull requests: Read and write**，不需要 Actions、账户或其他仓库权限。每次同步只申请 `homebrew-tap` 的短期 installation token，任务结束自动撤销。App 身份创建的 PR 可以正常触发 Tap 验收，无需人工批准机器人事件。
+
+也可在 GitHub 手动创建、安装私人 App，然后设置上述 Variable 和 Secret。私钥轮换时更新 Secret；如果配置脚本中断，已注册 App 可在 GitHub App 设置中重新生成私钥，无需扩大仓库授权。
+
+### 失败与重试
+
+主仓库 **Sync Homebrew Tap** 工作流可以手动输入已公开 tag 重试。已有同版本 PR 会复用；已关闭但未发布的 PR、被改写的分支会停止并要求维护者检查。Tap 验收失败时修复后重新运行测试；验收附件过期时先重新测试。
+
+Tap **brew pr-pull** 工作流仍支持手动恢复，输入 PR 编号和已审核的完整 head SHA；它使用同样的发布校验，不跳过双架构检查。完整流程记录在两个仓库的 Actions 日志及版本 PR 中。
+
+正式版必须包含 `sync-tap.yml` 后再创建 tag，已有旧 tag 不会补触发新增工作流，可使用手动重试入口。通过 GitHub 界面或维护者 `gh` 登录令牌公开草稿会触发同步；如果其他工作流使用本仓库 `GITHUB_TOKEN` 公开 Release，需要显式 dispatch `sync-tap.yml`，不能依赖该令牌产生事件来触发下一条工作流。
 
 卸载保留账户库和 Keychain。旧凭据助手路径失效时先运行 `doctor`，再重新启用对应账户以写入稳定路径，不删除用户数据。
 
