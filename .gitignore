@@ -4,3 +4,6 @@
 *.auth.json
 .DS_Store
 coverage.out
+.idea/
+__pycache__/
+*.py[cod]

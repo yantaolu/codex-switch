@@ -17,7 +17,7 @@ import time
 root = Path(__file__).resolve().parents[1]
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument('--use-installed-go', action='store_true', help='Use existing Homebrew Go without upgrading dependencies; record limited dependency acceptance')
-p.add_argument('--output', type=Path, default=root / 'docs/brew-acceptance-2026-10-10.json')
+p.add_argument('--output', type=Path, default=root / 'dist/validation/brew.json')
 args = p.parse_args()
 env = dict(os.environ, HOMEBREW_NO_AUTO_UPDATE='1', HOMEBREW_NO_INSTALL_CLEANUP='1', HOMEBREW_NO_ENV_HINTS='1')
 
@@ -85,6 +85,7 @@ try:
     steps.append('uninstall retained account data')
     result = dict(status='passed', brew=run(['brew', '--version']), versions=['0.8.0-rc.1', '0.8.0-rc.2'], steps=steps,
                   elapsed_seconds=round(time.monotonic() - started, 2), isolated=True, dependency_installation='existing Go reused' if args.use_installed_go else 'standard brew dependencies')
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, indent=2))
 finally:
