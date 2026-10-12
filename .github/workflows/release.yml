@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing stable tag, e.g. v1.0.0; creates a draft release'
+        description: 'Existing stable tag, e.g. v1.0.1; creates a draft release'
         required: true
         type: string
 

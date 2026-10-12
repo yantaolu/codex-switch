@@ -31,7 +31,7 @@ Tap 提供 Apple Silicon 和 Intel 的预编译 bottle；匹配平台时无需�
 git clone https://github.com/yantaolu/codex-switch.git
 cd codex-switch
 make test
-make install VERSION=1.0.0
+make install VERSION=1.0.1
 ```
 
 安装路径为 `~/.local/bin/codex-switch`，请确保该目录在 `PATH` 中。运行 `codex-switch version` 核对版本。
@@ -77,7 +77,7 @@ codex-switch use relay
 | [故障排查](docs/troubleshooting.md) | 进程阻塞、凭据失效、中断恢复和会话接续 |
 | [架构说明](docs/architecture.md) | 模块、事务、凭据与资源边界 |
 | [开发指南](docs/development.md) | 构建、测试、CI 和贡献约定 |
-| [发布指南](docs/releasing.md) | 1.0.0 打包、验收、Release 与 Homebrew |
+| [发布指南](docs/releasing.md) | 打包、验收、Release 与 Homebrew |
 | [版本记录](CHANGELOG.md) | 对外版本变化 |
 
 ## 数据与行为

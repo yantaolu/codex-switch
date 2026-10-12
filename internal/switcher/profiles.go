@@ -79,7 +79,7 @@ func ProviderTOML(p Provider) ([]byte, error) {
 		return nil, err
 	}
 	root := map[string]any{"model_provider": providerID, "model": p.Model}
-	for key, value := range p.Options {
+	for key, value := range normalizedAccountOptions(p.Options) {
 		root[key] = value
 	}
 	provider := map[string]any{"name": "codex-switch", "base_url": p.BaseURL, "wire_api": "responses", "requires_openai_auth": false, "experimental_bearer_token": p.APIKey}

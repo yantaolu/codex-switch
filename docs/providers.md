@@ -29,7 +29,11 @@ codex-switch edit relay
 
 导入只保存，不立即切换。导入不执行认证命令或读取环境变量，来源必须包含 `experimental_bearer_token`；MCP、hooks、插件、命令和本地路径不随账户导入。未知字段会提示未导入。
 
-支持的账户字段包括 `review_model`、`disable_response_storage`、`network_access`、`windows_wsl_setup_acknowledged` 及 `features.api_key_model_discovery`、`features.goals`、`features.image_generation`。旧客户端字段可能被 Codex 忽略。provider 可保存重试次数、流超时、WebSocket 和独立搜索能力字段。
+支持的账户字段包括 `review_model` 及 `features.api_key_model_discovery`、`features.goals`、`features.image_generation`。provider 可保存重试次数、流超时、WebSocket 和独立搜索能力字段。
+
+保存时自动过滤顶层 `disable_response_storage`、`network_access` 和 `windows_wsl_setup_acknowledged`，并提示已过滤的字段。前两项不是有效的顶层配置，后一项是 macOS 不使用的 Windows 引导状态。已有账户在读取、后续保存及切换时采用相同规则；编辑导出和生成的配置使用统一 TOML 格式。密钥、图片授权请求头、远程模型目录及有效功能开关保留。
+
+顶层 `network_access = "enabled"` 不会被自动迁移成沙箱联网权限。已有公共配置中的 `[sandbox_workspace_write] network_access = true` 保持原样，不随第三方账户导入或改变。
 
 文件导入最多 1 MiB，仅接受普通文件。地址支持 HTTP/HTTPS 和查询参数，不接受内嵌用户名密码或片段。当前配置使用内联或点号形式的 `features` 时，需改为 `[features]` 表。
 

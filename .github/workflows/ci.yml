@@ -27,7 +27,7 @@ jobs:
       - run: make build
       - run: CXS_PROCESS_ACCEPTANCE=1 go test ./internal/switcher -run '^TestControlledForceStopKeepsOtherHome$' -timeout 30s
       - run: python3 scripts/brew-acceptance.py --output dist/validation/brew-ci.json
-      - run: python3 scripts/release.py --version 1.0.0-ci
+      - run: python3 scripts/release.py --version 1.0.1-ci
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -mode=binary dist/darwin-arm64/codex-switch
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -mode=binary dist/darwin-amd64/codex-switch
       - run: shasum -a 256 -c checksums.txt

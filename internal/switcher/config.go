@@ -34,6 +34,9 @@ func Route(b []byte) (map[string]any, error) {
 	}
 	r := map[string]any{}
 	for k := range routeKeys {
+		if _, ignored := ignoredAccountRoot[k]; ignored {
+			continue
+		}
 		if v, ok := d[k]; ok {
 			r[k] = v
 		}
@@ -61,6 +64,9 @@ func PatchConfig(b []byte, route map[string]any, p *Provider, helper, storeDir, 
 	}
 	// A dotted top-level definition of a managed field cannot be safely projected.
 	for k := range routeKeys {
+		if _, ignored := ignoredAccountRoot[k]; ignored {
+			continue
+		}
 		if v, ok := original[k]; ok {
 			typ := "string"
 			if t, exists := accountRoot[k]; exists {
@@ -91,7 +97,8 @@ func PatchConfig(b []byte, route map[string]any, p *Provider, helper, storeDir, 
 			for it := n.Key(); it.Next(); {
 				parts = append(parts, string(it.Node().Data))
 			}
-			inOwned = len(parts) >= 2 && parts[0] == "model_providers" && parts[1] == providerID
+			_, ignored := ignoredAccountRoot[parts[0]]
+			inOwned = ignored || len(parts) >= 2 && parts[0] == "model_providers" && parts[1] == providerID
 			if inOwned {
 				sectionStart = offset
 			}
@@ -101,7 +108,8 @@ func PatchConfig(b []byte, route map[string]any, p *Provider, helper, storeDir, 
 			for it := n.Key(); it.Next(); {
 				parts = append(parts, string(it.Node().Data))
 			}
-			if len(parts) == 1 && routeKeys[parts[0]] && sectionStart == -1 {
+			_, ignored := ignoredAccountRoot[parts[0]]
+			if (ignored || len(parts) == 1 && routeKeys[parts[0]]) && sectionStart == -1 {
 				start := offset
 				end := int(n.Raw.Offset + n.Raw.Length)
 				if end < start {
@@ -136,7 +144,8 @@ func PatchConfig(b []byte, route map[string]any, p *Provider, helper, storeDir, 
 	out.Write(b[cursor:])
 	r := map[string]any{}
 	for k, v := range route {
-		if routeKeys[k] && k != "profile" {
+		_, ignored := ignoredAccountRoot[k]
+		if routeKeys[k] && k != "profile" && !ignored {
 			r[k] = v
 		}
 	}
@@ -163,6 +172,12 @@ func PatchConfig(b []byte, route map[string]any, p *Provider, helper, storeDir, 
 		return nil, e
 	}
 	result := append(append(prefix, '\n'), bytes.TrimLeft([]byte(out.String()), "\r\n")...)
+	// Patch features before appending the managed provider so the first and
+	// subsequent switches use the same table order and separator spacing.
+	result, e = patchFeatures(result, route)
+	if e != nil {
+		return nil, e
+	}
 	if p != nil {
 		args := []string{"--store", storeDir}
 		if len(homes) > 0 {
@@ -192,10 +207,6 @@ func PatchConfig(b []byte, route map[string]any, p *Provider, helper, storeDir, 
 		table = bytes.TrimPrefix(table, []byte("[model_providers]\n"))
 		result = append(bytes.TrimRight(result, "\r\n"), '\n', '\n')
 		result = append(result, table...)
-	}
-	result, e = patchFeatures(result, route)
-	if e != nil {
-		return nil, e
 	}
 	result = normalizeEmptyLines(result)
 	after, e := ParseConfig(result)
@@ -256,6 +267,9 @@ func ValidateProvider(p Provider) error {
 		}
 	}
 	for k, v := range p.Options {
+		if _, ignored := ignoredAccountRoot[k]; ignored {
+			continue // Accept legacy accounts; output and vault writes remove the field.
+		}
 		if k == "features" {
 			f, ok := v.(map[string]any)
 			if !ok {

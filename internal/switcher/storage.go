@@ -225,9 +225,43 @@ func (s *Store) Load() (State, error) {
 		return st, errors.New("不支持的凭据库版本")
 	}
 	st.Version = 2 // v1 aliases remain stable; optional remarks default to their ID.
-	return st, nil
+	return normalizedStateConfig(st), nil
+}
+
+// Normalize only account options. Recovery snapshots must keep their exact
+// original bytes, and loading a vault must never rewrite it without a save.
+func normalizedStateConfig(st State) State {
+	var profiles map[string]Profile
+	for id, profile := range st.Profiles {
+		route := normalizedAccountOptions(profile.Route)
+		changed := len(route) != len(profile.Route)
+		profile.Route = route
+		if profile.Provider != nil {
+			options := normalizedAccountOptions(profile.Provider.Options)
+			if len(options) != len(profile.Provider.Options) {
+				provider := *profile.Provider
+				provider.Options = options
+				profile.Provider = &provider
+				changed = true
+			}
+		}
+		if changed {
+			if profiles == nil {
+				profiles = make(map[string]Profile, len(st.Profiles))
+				for id, profile := range st.Profiles {
+					profiles[id] = profile
+				}
+			}
+			profiles[id] = profile
+		}
+	}
+	if profiles != nil {
+		st.Profiles = profiles
+	}
+	return st
 }
 func (s *Store) Save(st State) error {
+	st = normalizedStateConfig(st)
 	err := s.saveTransaction(st)
 	var write *replacedWriteError
 	if !errors.As(err, &write) || write.Path != filepath.Join(s.Dir, "vault.enc") {
@@ -262,7 +296,7 @@ func (s *Store) saveTransaction(st State) error {
 		}
 	}
 	st.Version = 2
-	return s.write("vault.enc", st)
+	return s.write("vault.enc", normalizedStateConfig(st))
 }
 
 const maxFileSize = 8 << 20

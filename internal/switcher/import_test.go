@@ -60,7 +60,7 @@ func TestImportRelayRoundTripAndRollback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if d["model"] != "gpt-5.5" || d["review_model"] != "gpt-5.5" || d["disable_response_storage"] != true || d["model_catalog_json"] != nil {
+	if d["model"] != "gpt-5.5" || d["review_model"] != "gpt-5.5" || d["disable_response_storage"] != nil || d["network_access"] != nil || d["windows_wsl_setup_acknowledged"] != nil || d["model_catalog_json"] != nil {
 		t.Fatal("route fields wrong")
 	}
 	provider := d["model_providers"].(map[string]any)[providerID].(map[string]any)

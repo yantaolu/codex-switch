@@ -8,8 +8,34 @@ import (
 )
 
 var accountRoot = map[string]string{
-	"review_model": "string", "disable_response_storage": "bool", "network_access": "string", "windows_wsl_setup_acknowledged": "bool",
+	"review_model": "string",
 }
+
+// These top-level fields are ignored for all macOS accounts. Keep them owned
+// by the config patcher so old live configurations can be cleaned on switching.
+var ignoredAccountRoot = map[string]string{
+	"disable_response_storage":       "当前配置不支持该顶层字段",
+	"network_access":                 "该顶层字段无效，保留已有沙箱联网设置",
+	"windows_wsl_setup_acknowledged": "macOS 不使用 Windows 引导状态",
+}
+
+// Copy only when cleanup is needed; callers may still hold the original map
+// for a failed save or rollback. Nested features and other values are untouched.
+func normalizedAccountOptions(options map[string]any) map[string]any {
+	for key := range ignoredAccountRoot {
+		if _, exists := options[key]; exists {
+			clean := make(map[string]any, len(options))
+			for key, value := range options {
+				if _, ignored := ignoredAccountRoot[key]; !ignored {
+					clean[key] = value
+				}
+			}
+			return clean
+		}
+	}
+	return options
+}
+
 var accountFeatures = map[string]bool{"api_key_model_discovery": true, "goals": true, "image_generation": true}
 var providerExtra = map[string]string{
 	"supports_websockets": "bool", "supports_standalone_web_search": "bool",
@@ -70,14 +96,13 @@ func ImportTOML(raw []byte) (Provider, []string, error) {
 	warnings := []string{}
 	p.Options = map[string]any{}
 	for k, v := range d {
-		if typ, ok := accountRoot[k]; ok {
+		if reason, ignored := ignoredAccountRoot[k]; ignored {
+			warnings = append(warnings, k+"：已过滤（"+reason+"）")
+		} else if typ, ok := accountRoot[k]; ok {
 			if !validOption(v, typ) {
 				return p, nil, fmt.Errorf("字段 %s 类型无效", k)
 			}
 			p.Options[k] = v
-			if k != "review_model" {
-				warnings = append(warnings, k+"：当前 Codex schema 未声明，保留但可能被客户端忽略")
-			}
 		} else if k != "model" && k != "model_provider" && k != "model_providers" && k != "features" {
 			warnings = append(warnings, k+"：未导入")
 		}

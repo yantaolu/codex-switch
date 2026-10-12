@@ -5,7 +5,7 @@
 使用 macOS、Python 3 和满足 `go.mod` 的 Go 版本。原生集成需要官方 Codex CLI；Homebrew 验收需要 `brew`。从仓库根目录运行：
 
 ```sh
-make build VERSION=1.0.0
+make build VERSION=1.0.1
 bin/codex-switch version
 go test -race -count=1 -timeout 3m ./...
 go vet ./...
@@ -29,7 +29,7 @@ CXS_PROCESS_ACCEPTANCE=1 go test ./internal/switcher \
 
 ```sh
 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
-python3 scripts/release.py --version 1.0.0
+python3 scripts/release.py --version 1.0.1
 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 \
   -mode=binary dist/darwin-arm64/codex-switch
 go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 \

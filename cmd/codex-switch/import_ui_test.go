@@ -81,3 +81,31 @@ func TestEditorErrorPreservesDraftAndFocus(t *testing.T) {
 		t.Fatal("cancel failed")
 	}
 }
+
+func TestEditorSaveFiltersRelayFieldsAndRetainsPlaintextDraft(t *testing.T) {
+	raw := "disable_response_storage = true\nnetwork_access = 'enabled'\nwindows_wsl_setup_acknowledged = true\n" + editorSource +
+		"model_catalog_url = 'https://example.com/v1/models'\nhttp_headers = { 'x-openai-actor-authorization' = 'local-image-extension' }\n" +
+		"[features]\napi_key_model_discovery = true\ngoals = true\n"
+	var saved switcher.Provider
+	m := newProviderEditor(func(_ context.Context, _ string, p switcher.Provider) error {
+		saved = p
+		return nil
+	})
+	m.Name.SetValue("relay")
+	m.Config.SetValue(raw)
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlS})
+	m = next.(providerEditor)
+	if cmd == nil || !m.Saving || len(m.Warnings) != 3 || m.Config.Value() != raw {
+		t.Fatal("save failed to normalize configuration or altered the editable draft")
+	}
+	next, _ = m.Update(cmd())
+	m = next.(providerEditor)
+	if !m.Done || saved.APIKey != "sk-test-visible" || saved.CatalogURL != "https://example.com/v1/models" || saved.Headers["x-openai-actor-authorization"] != "local-image-extension" {
+		t.Fatal("save lost required provider settings")
+	}
+	for _, key := range []string{"disable_response_storage", "network_access", "windows_wsl_setup_acknowledged"} {
+		if _, exists := saved.Options[key]; exists {
+			t.Errorf("saved account still contains %s", key)
+		}
+	}
+}

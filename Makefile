@@ -1,5 +1,5 @@
 .PHONY: build test check install release
-VERSION ?= 1.0.0
+VERSION ?= 1.0.1
 build:
 	CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=$(VERSION)" -o bin/codex-switch ./cmd/codex-switch
 test:

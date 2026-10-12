@@ -1,6 +1,6 @@
 # 发布指南
 
-## 1.0.0 发布范围
+## 发布范围
 
 发布 macOS Apple Silicon、Intel 的可执行包，以及供 Homebrew 离线构建的 vendored 源码包。附件包含许可证、公开文档和依赖信息。
 
@@ -21,19 +21,19 @@
 从将要发布的提交构建，使用独立输出目录，避免混入历史版本：
 
 ```sh
-python3 scripts/release.py --version 1.0.0 --output dist/1.0.0
-(cd dist/1.0.0 && shasum -a 256 -c checksums.txt)
-dist/1.0.0/darwin-arm64/codex-switch version
-tar -tzf dist/1.0.0/codex-switch_1.0.0_source.tar.gz
+python3 scripts/release.py --version 1.0.1 --output dist/1.0.1
+(cd dist/1.0.1 && shasum -a 256 -c checksums.txt)
+dist/1.0.1/darwin-arm64/codex-switch version
+tar -tzf dist/1.0.1/codex-switch_1.0.1_source.tar.gz
 ```
 
-Apple Silicon 本机运行 arm64；Intel 本机运行 amd64。使用与本机匹配的二进制核对输出为 `1.0.0`。
+Apple Silicon 本机运行 arm64；Intel 本机运行 amd64。使用与本机匹配的二进制核对输出为 `1.0.1`。
 
 | 附件 | 用途 |
 | --- | --- |
-| `codex-switch_1.0.0_darwin_arm64.tar.gz` | Apple Silicon |
-| `codex-switch_1.0.0_darwin_amd64.tar.gz` | Intel |
-| `codex-switch_1.0.0_source.tar.gz` | 包含依赖的源代码 |
+| `codex-switch_1.0.1_darwin_arm64.tar.gz` | Apple Silicon |
+| `codex-switch_1.0.1_darwin_amd64.tar.gz` | Intel |
+| `codex-switch_1.0.1_source.tar.gz` | 包含依赖的源代码 |
 | `checksums.txt` | 三份归档的 SHA-256 |
 | `codex-switch.rb` | 绑定版本 URL 与源码校验和的 Homebrew Formula |
 
@@ -41,7 +41,7 @@ Apple Silicon 本机运行 arm64；Intel 本机运行 amd64。使用与本机匹
 
 ## GitHub Release
 
-将审核过的代码与文档提交到仓库，在相同提交创建并推送 `v1.0.0` tag。`.github/workflows/release.yml` 在 Apple Silicon 和 Intel macOS runner 上分别执行测试、原生 Codex 协议、受控进程、Homebrew 生命周期及漏洞验收，再构建并运行各自的安装包。
+将审核过的代码与文档提交到仓库，在相同提交创建并推送 `v1.0.1` tag。`.github/workflows/release.yml` 在 Apple Silicon 和 Intel macOS runner 上分别执行测试、原生 Codex 协议、受控进程、Homebrew 生命周期及漏洞验收，再构建并运行各自的安装包。
 
 两个架构通过后，工作流核对各自校验和与源码归档一致性，合并附件并创建草稿。重试只更新现有草稿，拒绝覆盖已公开版本。也可手动运行正式工作流，输入已有稳定 tag。
 
